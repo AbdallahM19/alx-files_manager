@@ -1,34 +1,36 @@
 import sha1 from 'sha1';
 import dbClient from '../utils/db';
-import RedisClient from '../utils/redis';
 
 const { ObjectId } = require('mongodb');
+const RedisClient = require('../utils/redis');
 
 class UsersController {
   static postNew(req, res) {
     const { email, password } = req.body;
 
     if (!email) {
-      return res.status(400).json({ error: 'Missing email' });
+      res.status(400).json({ error: 'Missing email' });
+      return;
     }
     if (!password) {
-      return res.status(400).json({ error: 'Missing password' });
+      res.status(400).json({ error: 'Missing password' });
+      return;
     }
 
     const userCollection = dbClient.db.collection('users');
-    const userExists = userCollection.findOne({ email });
-
-    if (userExists) {
-      return res.status(400).json({ error: 'Already exist' });
-    }
-
-    const hashedPassword = sha1(password);
-    const result = userCollection.insertOne({
-      email,
-      password: hashedPassword,
+    userCollection.findOne({ email }, (err, userExists) => {
+      if (userExists) {
+        res.status(400).json({ error: 'Already exist' });
+      } else {
+        const hashedPassword = sha1(password);
+        userCollection.insertOne({
+          email,
+          password: hashedPassword,
+        }).then((result) => {
+          res.status(201).json({ id: result.insertedId, email });
+        }).catch((error) => console.log(error));
+      }
     });
-
-    return res.status(201).json({ id: result.insertedId, email });
   }
 
   static async getMe(req, res) {
