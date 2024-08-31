@@ -14,14 +14,14 @@ class UsersController {
       return response.status(400).json({ error: 'Missing password' });
     }
 
-    const userExists = await dbClient.dbClient.collection('users').findOne({ email });
+    const userExists = await dbClient.db.collection('users').findOne({ email });
     if (userExists) {
       return response.status(400).json({ error: 'Already exist' });
     }
 
     const hashedPassword = sha1(password);
 
-    const result = await dbClient.dbClient.collection('users').insertOne({ email, password: hashedPassword });
+    const result = await dbClient.db.collection('users').insertOne({ email, password: hashedPassword });
     return response.status(201).json({ id: result.insertedId, email });
   }
 
@@ -42,7 +42,7 @@ class UsersController {
         return res.status(500).json({ error: 'Database connection error' });
       }
 
-      const user = await dbClient.dbClient.collection('users').findOne({ _id: ObjectId(userId) });
+      const user = await dbClient.db.collection('users').findOne({ _id: ObjectId(userId) });
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
