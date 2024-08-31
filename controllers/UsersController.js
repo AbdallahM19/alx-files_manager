@@ -5,7 +5,7 @@ import RedisClient from '../utils/redis';
 const { ObjectId } = require('mongodb');
 
 class UsersController {
-  static async postNew(req, res) {
+  static postNew(req, res) {
     const { email, password } = req.body;
 
     if (!email) {
@@ -16,14 +16,14 @@ class UsersController {
     }
 
     const userCollection = dbClient.db.collection('users');
-    const userExists = await userCollection.findOne({ email });
+    const userExists = userCollection.findOne({ email });
 
     if (userExists) {
       return res.status(400).json({ error: 'Already exist' });
     }
 
     const hashedPassword = sha1(password);
-    const result = await userCollection.insertOne({
+    const result = userCollection.insertOne({
       email,
       password: hashedPassword,
     });
