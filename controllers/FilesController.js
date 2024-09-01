@@ -83,26 +83,42 @@ class FilesController {
 
   static async getIndex(req, res) {
     const user = await FilesController.getUserData(req);
-    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
 
-    const { parentId = '0', page = 0 } = req.query;
+    const { parentId = 0, page = 0 } = req.query;
     const query = { userId: user._id };
-    if (parentId !== '0') {
-      query.parentId = new ObjectId(parentId);
-    } else {
-      query.parentId = 0;
+    if (parentId !== 0) {
+      query.parentId = ObjectId(parentId);
     }
 
-    try {
-      const files = await dbClient.db.collection('files')
-        .find(query)
-        .skip(Number(page) * 20)
-        .limit(20)
-        .toArray();
-      return res.status(200).json(files);
-    } catch (err) {
-      return res.status(500).json({ error: 'Internal Server Error' });
+    const files = await dbClient.db.collection('files')
+      .aggregate([
+        { $match: query },
+        { $sort: { _id: -1 } },
+        {
+          $facet: {
+            metadata: [{ $count: 'total' }, { $addFields: { page: parseInt(page, 10) } }],
+            data: [{ $skip: 20 * parseInt(page, 10) }, { $limit: 20 }],
+          },
+        },
+      ])
+      .toArray();
+
+    if (files.length > 0) {
+      const formattedFiles = files[0].data.map((file) => ({
+        id: file._id,
+        userId: file.userId,
+        name: file.name,
+        type: file.type,
+        isPublic: file.isPublic,
+        parentId: file.parentId,
+      }));
+      return res.status(200).json(formattedFiles);
     }
+
+    return res.status(404).json({ error: 'Not found' });
   }
 }
 
