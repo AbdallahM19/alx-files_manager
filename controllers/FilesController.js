@@ -51,10 +51,7 @@ class FilesController {
       const folderPath = process.env.FOLDER_PATH || '/tmp/files_manager';
       const fileId = uuidv4();
       const localPath = path.join(folderPath, fileId);
-      if (!fs.existsSync(folderPath)) {
-        fs.mkdirSync(folderPath, { recursive: true });
-      }
-
+      fs.mkdirSync(folderPath, { recursive: true });
       fs.writeFileSync(localPath, Buffer.from(data, 'base64'));
       fileData.localPath = localPath;
     }
