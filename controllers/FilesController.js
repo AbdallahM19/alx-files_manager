@@ -70,12 +70,15 @@ class FilesController {
 
   static async getShow(req, res) {
     const user = await FilesController.getUserData(req);
-    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
 
-    const file = await dbClient.db.collection('files').findOne({ _id: new ObjectId(req.params.id) });
-    if (!file || file.userId.toString() !== user._id.toString()) return res.status(404).json({ error: 'Not found' });
-
-    return res.status(200).json(file);
+    const file = await dbClient.db.collection('files').findOne({ _id: new ObjectId(req.params.id), userId: user._id });
+    if (file) {
+      return res.status(200).json(file);
+    }
+    return res.status(404).json({ error: 'Not found' });
   }
 
   static async getIndex(req, res) {
