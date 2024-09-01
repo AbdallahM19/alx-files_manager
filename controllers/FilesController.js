@@ -39,11 +39,11 @@ class FilesController {
     }
 
     const fileData = {
-      userId: ObjectId(userId),
+      userId,
       name,
       type,
       isPublic,
-      parentId: parentId === 0 ? '0' : ObjectId(parentId),
+      parentId: parentId === 0 ? '0' : parentId,
       localPath: null,
     };
 
