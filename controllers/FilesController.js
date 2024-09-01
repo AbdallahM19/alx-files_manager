@@ -8,35 +8,23 @@ import dbClient from '../utils/db';
 class FilesController {
   static async postUpload(req, res) {
     const token = req.headers['x-token'];
-    const key = `auth_${token}`;
-    const userId = await redisClient.get(key);
-    if (!userId || !token) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
+    if (!token) return res.status(401).json({ error: 'Unauthorized' });
+
+    const userId = await redisClient.get(`auth_${token}`);
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
     const {
-      name, type, parentId = 0, isPublic = false, data,
+      name, type, parentId = '0', isPublic = false, data,
     } = req.body;
 
-    if (!name) {
-      return res.status(400).json({ error: 'Missing name' });
-    }
-    if (!type || !['folder', 'file', 'image'].includes(type)) {
-      return res.status(400).json({ error: 'Missing type' });
-    }
-    if (!data && type !== 'folder') {
-      return res.status(400).json({ error: 'Missing data' });
-    }
+    if (!name) return res.status(400).json({ error: 'Missing name' });
+    if (!type || !['folder', 'file', 'image'].includes(type)) return res.status(400).json({ error: 'Invalid type' });
+    if (type !== 'folder' && !data) return res.status(400).json({ error: 'Missing data' });
 
-    let parentFile = null;
-    if (parentId !== 0) {
-      parentFile = await dbClient.db.collection('files').findOne({ _id: ObjectId(parentId) });
-      if (!parentFile) {
-        return res.status(400).json({ error: 'Parent not found' });
-      }
-      if (parentFile.type !== 'folder') {
-        return res.status(400).json({ error: 'Parent is not a folder' });
-      }
+    if (parentId !== '0') {
+      const parentFile = await dbClient.db.collection('files').findOne({ _id: ObjectId(parentId) });
+      if (!parentFile) return res.status(400).json({ error: 'Parent not found' });
+      if (parentFile.type !== 'folder') return res.status(400).json({ error: 'Parent is not a folder' });
     }
 
     const fileData = {
@@ -44,7 +32,7 @@ class FilesController {
       name,
       type,
       isPublic,
-      parentId: parentId === 0 ? '0' : ObjectId(parentId),
+      parentId: parentId === '0' ? '0' : ObjectId(parentId),
       localPath: null,
     };
 
@@ -66,7 +54,7 @@ class FilesController {
   }
 
   static async getShow(req, res) {
-    const token = req.header('X-Token');
+    const token = req.headers['x-token'];
     if (!token) return res.status(401).json({ error: 'Unauthorized' });
 
     const userId = await redisClient.get(`auth_${token}`);
@@ -82,10 +70,10 @@ class FilesController {
 
   static async getIndex(req, res) {
     const token = req.headers['x-token'];
+    if (!token) return res.status(401).json({ error: 'Unauthorized' });
+
     const userIdString = await redisClient.get(`auth_${token}`);
-    if (!token || !userIdString) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
+    if (!userIdString) return res.status(401).json({ error: 'Unauthorized' });
 
     const userId = ObjectId(userIdString);
     const parentId = req.query.parentId ? ObjectId(req.query.parentId) : ObjectId('0');
@@ -96,9 +84,7 @@ class FilesController {
     const filesCount = await dbClient.db.collection('files')
       .countDocuments({ userId, parentId });
 
-    if (filesCount === 0) {
-      return res.json([]);
-    }
+    if (filesCount === 0) return res.json([]);
 
     const files = await dbClient.db.collection('files')
       .aggregate([
@@ -117,4 +103,4 @@ class FilesController {
   }
 }
 
-module.exports = FilesController;
+export default FilesController;
