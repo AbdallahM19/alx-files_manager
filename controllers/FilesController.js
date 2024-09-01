@@ -45,7 +45,6 @@ class FilesController {
       type,
       isPublic,
       parentId: parentId === 0 ? '0' : ObjectId(parentId),
-      localPath: null,
     };
 
     if (type !== 'folder') {
