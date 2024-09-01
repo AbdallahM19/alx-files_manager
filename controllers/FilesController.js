@@ -6,21 +6,11 @@ import redisClient from '../utils/redis';
 import dbClient from '../utils/db';
 
 class FilesController {
-  static async getUser(userId) {
-    if (userId) {
-      const users = dbClient.db.collection('users');
-      const user = await users.findOne({ _id: new ObjectId(userId) });
-      if (user) return user;
-    }
-    return null;
-  }
-
   static async postUpload(req, res) {
     const token = req.headers['x-token'];
     const key = `auth_${token}`;
     const userId = await redisClient.get(key);
-    const user = await FilesController.getUser(userId);
-    if (!userId || !token || user) {
+    if (!userId || !token) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
@@ -40,7 +30,7 @@ class FilesController {
 
     let parentFile = null;
     if (parentId !== 0) {
-      parentFile = await dbClient.db.collection('files').findOne({ _id: new ObjectId(parentId) });
+      parentFile = await dbClient.db.collection('files').findOne({ _id: ObjectId(parentId) });
       if (!parentFile) {
         return res.status(400).json({ error: 'Parent not found' });
       }
@@ -62,8 +52,8 @@ class FilesController {
       const folderPath = process.env.FOLDER_PATH || '/tmp/files_manager';
       const fileId = uuidv4();
       const localPath = path.join(folderPath, fileId);
-      fs.mkdirSync(folderPath, { recursive: true });
-      fs.writeFileSync(localPath, Buffer.from(data, 'base64'));
+      await fs.promises.mkdir(folderPath, { recursive: true });
+      await fs.promises.writeFile(localPath, Buffer.from(data, 'base64'));
       fileData.localPath = localPath;
     }
 
