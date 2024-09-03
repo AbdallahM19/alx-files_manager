@@ -194,6 +194,12 @@ class FilesController {
         return res.status(404).json({ error: 'Not found' });
       }
     }
+
+    const { size } = req.query;
+    if (size && file.type === 'image' && ['250', '500', '100'].includes(size)) {
+      file.localPath = `${file.localPath}_${size}`;
+    }
+
     if (!fs.existsSync(file.localPath)) {
       return res.status(404).json({ error: 'Not found' });
     }
