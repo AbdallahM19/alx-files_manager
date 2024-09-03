@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import mime from 'mime-types';
 import redisClient from '../utils/redis';
 import dbClient from '../utils/db';
+import { fileQueue } from '../worker';
 
 class FilesController {
   static async getUserData(request) {
@@ -55,6 +56,15 @@ class FilesController {
       const localPath = path.join(folderPath, uuidv4());
       fs.writeFileSync(localPath, Buffer.from(data, 'base64'));
       fileData.localPath = localPath;
+
+      if (type === 'image') {
+        const newresult = await dbClient.db.collection('files')
+          .insertOne(fileData);
+        fileQueue.add({
+          userId: user._id,
+          fileId: newresult.insertedId,
+        });
+      }
     }
 
     const result = await dbClient.db.collection('files').insertOne(fileData);
@@ -168,29 +178,47 @@ class FilesController {
 
   static async getFile(req, res) {
     const { id } = req.params;
-    const file = await dbClient.db.collection('files')
-      .findOne({ _id: new ObjectId(id) });
-    if (!file) {
-      return res.status(404).json({ error: 'Not found' });
-    }
-    if (file.type === 'folder') {
-      return res.status(400)
-        .json({ error: "A folder doesn't have content" });
-    }
+    const files = dbClient.db.collection('files');
+    const idObject = new ObjectId(id);
 
-    const user = await FilesController.getUserData(req);
-    if (!file.isPublic) {
-      if (!user || (user._id.toString() !== file.userId.toString())) {
+    try {
+      const file = await files.findOne({ _id: idObject });
+
+      if (!file) {
         return res.status(404).json({ error: 'Not found' });
       }
-    }
-    if (!fs.existsSync(file.localPath)) {
-      return res.status(404).json({ error: 'Not found' });
-    }
 
-    const mimeType = mime.lookup(file.name);
-    res.setHeader('Content-Type', mimeType);
-    return res.status(200).sendFile(file.localPath);
+      if (!file.isPublic) {
+        const user = await FilesController.getUserData(req);
+        if (!user || file.userId.toString() !== user._id.toString()) {
+          return res.status(404).json({ error: 'Not found' });
+        }
+      }
+
+      if (file.type === 'folder') {
+        return res.status(400).json({ error: "A folder doesn't have content" });
+      }
+
+      try {
+        const filePath = file.localPath;
+        const { size } = req.query;
+        const finalPath = size ? `${filePath}_${size}` : filePath;
+
+        await fs.access(finalPath);
+
+        const contentType = mime.contentType(path.extname(finalPath));
+        const data = await fs.readFile(finalPath);
+
+        res.header('Content-Type', contentType || 'application/octet-stream');
+        return res.status(200).send(data);
+      } catch (error) {
+        console.error(error);
+        return res.status(404).json({ error: 'Not found' });
+      }
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
   }
 }
 
