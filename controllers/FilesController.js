@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import mime from 'mime-types';
 import redisClient from '../utils/redis';
 import dbClient from '../utils/db';
-// import { fileQueue } from '../worker';
+import { fileQueue } from '../worker';
 
 class FilesController {
   static async getUserData(request) {
@@ -57,14 +57,14 @@ class FilesController {
       fs.writeFileSync(localPath, Buffer.from(data, 'base64'));
       fileData.localPath = localPath;
 
-      // if (type === 'image') {
-      //   const newresult = await dbClient.db.collection('files')
-      //     .insertOne(fileData);
-      //   fileQueue.add({
-      //     userId: user._id,
-      //     fileId: newresult.insertedId,
-      //   });
-      // }
+      if (type === 'image') {
+        const newresult = await dbClient.db.collection('files')
+          .insertOne(fileData);
+        fileQueue.add({
+          userId: user._id,
+          fileId: newresult.insertedId,
+        });
+      }
     }
 
     const result = await dbClient.db.collection('files').insertOne(fileData);
