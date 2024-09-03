@@ -178,34 +178,37 @@ class FilesController {
 
   static async getFile(req, res) {
     const { id } = req.params;
+    const user = await this.getUserData(req);
     const files = dbClient.db.collection('files');
-    const idObject = new ObjectId(id);
-    const file = await files.findOne({ _id: idObject });
 
-    if (!file) {
-      return res.status(404).json({ error: 'Not found' });
-    }
-    if (!file.isPublic) {
-      const user = await FilesController.getUser(req);
-      if (!user || file.userId.toString() !== user._id.toString()) {
+    try {
+      const file = await files.findOne({ _id: new ObjectId(id) });
+      if (!file) {
         return res.status(404).json({ error: 'Not found' });
       }
-    }
-    if (file.type === 'folder') {
-      return res.status(400).json({ error: "A folder doesn't have content" });
-    }
-    try {
-      const filePath = file.localPath;
-      const { size } = req.query; // Use query parameter for size
-      const finalPath = size ? `${filePath}_${size}` : filePath;
-      await fs.access(finalPath);
-      const contentType = mime.contentType(path.extname(finalPath));
-      const data = await fs.readFile(finalPath);
-      res.header('Content-Type', contentType || 'application/octet-stream');
-      return res.status(200).send(data);
-    } catch (error) {
-      console.error(error);
-      return res.status(404).json({ error: 'Not found' });
+      if (file.type === 'folder') {
+        return res.status(400).json({ error: "A folder doesn't have content" });
+      }
+      if (!file.isPublic && (!user || file.userId.toString() !== user._id.toString())) {
+        return res.status(404).json({ error: 'Not found' });
+      }
+
+      let fileName = file.localPath;
+      const size = req.param('size');
+      if (size) {
+        fileName = `${file.localPath}_${size}`;
+      }
+
+      try {
+        const data = await fs.readFile(fileName);
+        const contentType = mime.contentType(file.name);
+        return res.header('Content-Type', contentType).status(200).send(data);
+      } catch (error) {
+        return res.status(404).json({ error: 'Not found' });
+      }
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ error: 'Internal server error' });
     }
   }
 }
